@@ -1,0 +1,117 @@
+#pragma kernel CSMain
+
+struct Boid
+{
+    float3 position;
+    float3 velocity;
+    float3 separation;
+    float3 alignment;
+    float3 cohesion;
+};
+
+StructuredBuffer<Boid> oldBoidBuffer;
+RWStructuredBuffer<Boid> newBoidBuffer;
+
+int maxBoids;
+float neighbourRadius;
+float fovAngle;
+float boundsSize;
+float steerSpeed;
+float maxVelocityMagnitude;
+float minVelocityMagnitude;
+
+float dt;
+
+float positiveMod(float a, float m)
+{
+    return fmod(fmod(a, m) + m, m);
+}
+
+float3 keepInBounds(float3 position, float bounds)
+{
+    float3 result;
+    result.x = positiveMod(position.x + bounds, bounds * 2) - bounds;
+    result.y = positiveMod(position.y + bounds, bounds * 2) - bounds;
+    result.z = positiveMod(position.z + bounds, bounds * 2) - bounds;
+
+    return result;
+}
+
+float3 safeNormalize(float3 vec)
+{
+    if (length(vec) > 0.001f)
+        vec = normalize(vec);
+
+    return vec;
+}
+
+[numthreads(1024,1,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= (uint) maxBoids)
+        return;
+    
+    int neighbours = 0;
+    
+    Boid boid = oldBoidBuffer[id.x];
+    
+    float3 separation = (0).xxx;
+    float3 alignment = (0).xxx;
+    float3 cohesion = (0).xxx;
+    
+    for (int i = 0; i < maxBoids; ++i)
+    {
+        if ((uint)i == id.x)
+            continue;
+        
+        Boid other = oldBoidBuffer[i];
+    
+        
+        if (distance(boid.position, other.position) <= neighbourRadius && dot(safeNormalize(boid.velocity), safeNormalize(other.velocity)) >= fovAngle)
+        {
+            ++neighbours;
+    
+            separation += boid.position - other.position;
+            alignment += other.velocity;
+            cohesion += other.position;
+        }
+    }
+
+    newBoidBuffer[id.x].velocity = boid.velocity;
+
+    if (neighbours > 0)
+    {
+        separation /= neighbours;
+        alignment = alignment / neighbours - boid.velocity;
+        cohesion = cohesion / neighbours - boid.position;
+
+        separation = safeNormalize(separation);
+        alignment = safeNormalize(alignment);
+        cohesion = safeNormalize(cohesion);
+
+        newBoidBuffer[id.x].separation = separation;
+        newBoidBuffer[id.x].alignment = alignment;
+        newBoidBuffer[id.x].cohesion = cohesion;
+
+        float3 acceleration = separation * 1.5f + alignment * 1.0f + cohesion * 1.0f;
+    
+        newBoidBuffer[id.x].velocity += acceleration * steerSpeed * dt;
+    } else
+    {
+        newBoidBuffer[id.x].separation = float3(0, 0, 0);
+        newBoidBuffer[id.x].alignment = float3(0, 0, 0);
+        newBoidBuffer[id.x].cohesion = float3(0, 0, 0);
+    }
+    
+    if (length(newBoidBuffer[id.x].velocity) > maxVelocityMagnitude)
+        newBoidBuffer[id.x].velocity = normalize(newBoidBuffer[id.x].velocity) * maxVelocityMagnitude;
+    
+    if (length(newBoidBuffer[id.x].velocity) < minVelocityMagnitude)
+        newBoidBuffer[id.x].velocity = normalize(newBoidBuffer[id.x].velocity) * minVelocityMagnitude;
+
+    newBoidBuffer[id.x].position = boid.position + newBoidBuffer[id.x].velocity * dt;
+
+    newBoidBuffer[id.x].velocity *= 0.999f; 
+
+    newBoidBuffer[id.x].position = keepInBounds(newBoidBuffer[id.x].position, boundsSize);
+}

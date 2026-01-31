@@ -1,0 +1,26 @@
+#pragma kernel CSMain
+
+RWTexture2D<float4> Result;
+float worldTime;
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    float w, h;
+    Result.GetDimensions(w, h);
+    
+    float2 uv = id.xy / float2(w, h);
+
+    float amplitude = 0.3f;
+    float freq = 20;
+    float timeSpeed = 5;
+    float yOffset = 0.5f;
+
+    worldTime = fmod(worldTime, 10000);
+
+    float sinval = sin(uv.xy * freq + worldTime * timeSpeed) * amplitude + yOffset;
+
+    float4 linecolor = 1.0f - abs(uv.y - sinval);
+    
+    Result[id.xy] = linecolor > 0.96f;
+}

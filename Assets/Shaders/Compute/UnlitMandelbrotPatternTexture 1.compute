@@ -1,0 +1,79 @@
+#pragma kernel CSMain
+
+RWTexture2D<float4> Result;
+
+float zoom;
+float2 offset;
+
+struct Complex
+{
+    double real;
+    double imag;
+};
+
+Complex mul_complex(Complex a, Complex b)
+{
+    Complex res = {a.real * b.real - a.imag * b.imag, a.real * b.imag + b.real * a.imag}; 
+    return res;
+}
+
+Complex add_complex(Complex a, Complex b)
+{
+    Complex res = {a.real + b.real, a.imag + b.imag};
+    return res;
+}
+
+float length_sq_complex(Complex a)
+{
+    return a.real * a.real + a.imag * a.imag;
+}
+
+float3 GetPalette(float t)
+{
+    float3 a = float3(0.5, 0.5, 0.5);
+    float3 b = float3(0.5, 0.5, 0.5);
+    float3 c = float3(1.0, 1.0, 1.0);
+    float3 d = float3(0.263, 0.416, 0.557);
+
+    return a + b * cos(6.28318 * (c * t + d));
+}
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    uint w, h;
+    Result.GetDimensions(w, h);
+    
+    float2 uv = (float2(id.xy) - float2(w, h) * 0.5) / float(h);
+    
+    Complex C;
+    C.real = offset.x + uv.x * zoom;
+    C.imag = offset.y + uv.y * zoom;
+
+    Complex Z = {0, 0};
+    int i = 0;
+    const int MaxIter = 300;
+    
+    for (; i < MaxIter; ++i)
+    {
+        Z = add_complex(mul_complex(Z, Z), C);
+        
+        if (length_sq_complex(Z) > 4.0)
+            break;
+    }
+
+    if (i == MaxIter)
+    {
+        Result[id.xy] = float4(0, 0, 0, 1);
+    }
+    else
+    {
+        float log_zn = log2(length_sq_complex(Z)) / 2.0;
+        float nu = log2(log_zn);
+        float smoothed_iter = float(i) + 1.0 - nu;
+
+        float t = smoothed_iter * 0.05;
+
+        Result[id.xy] = float4(GetPalette(t), 1);
+    }
+}
