@@ -41,9 +41,6 @@ Shader "Custom/Particles"
                 float size : PSIZE;
             };
 
-            TEXTURE2D(_BaseMap);
-            SAMPLER(sampler_BaseMap);
-
             CBUFFER_START(UnityPerMaterial)
             float _PointSize;
             CBUFFER_END
@@ -57,7 +54,7 @@ Shader "Custom/Particles"
                 OUT.positionHCS = TransformObjectToHClip(IN.positionOS.xyz + particle.position);
                 OUT.color = particle.color;
 
-                OUT.size = _PointSize;
+                // OUT.size = _PointSize;
                 
                 return OUT;
             }

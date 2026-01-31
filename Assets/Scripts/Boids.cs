@@ -87,7 +87,9 @@ public class Boids : MonoBehaviour
     void Update() {
         shader.SetFloat(DT, Time.deltaTime);
         
-        shader.Dispatch(kernelID, Mathf.CeilToInt(maxBoids / (float)groupSizeX), 1, 1);
+        int groupAmountX = Mathf.Min(Mathf.CeilToInt(maxBoids / (float)groupSizeX), 65535);
+        
+        shader.Dispatch(kernelID, groupAmountX, 1, 1);
         
         Graphics.RenderMeshPrimitives(renderParams, boidMesh, 0, maxBoids);
 

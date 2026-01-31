@@ -122,20 +122,31 @@ float positiveMod(float a, float m)
     return fmod(fmod(a, m) + m, m);
 }
 
+float3 keepInBounds(float3 position, float bounds)
+{
+    float3 result;
+
+    float doubleBounds = bounds * 2;
+    
+    result.x = positiveMod(position.x + bounds, doubleBounds) - bounds;
+    result.y = positiveMod(position.y + bounds, doubleBounds) - bounds;
+    result.z = positiveMod(position.z + bounds, doubleBounds) - bounds;
+
+    return result;
+}
+
 [numthreads(32,1,1)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
     float frequency = 20;
     float strength = 10;
     
-    particleBuffer[id.x].velocity += SimplexNoise(particleBuffer[id.x].position * frequency) * strength;
-    // particleBuffer[id.x].velocity.y = min(particleBuffer[id.x].velocity.y - 9.81f * deltaTime, 100);
+    // particleBuffer[id.x].velocity += SimplexNoise(particleBuffer[id.x].position * frequency) * strength;
+    particleBuffer[id.x].velocity.y = min(particleBuffer[id.x].velocity.y - 9.81f * deltaTime, 100);
     particleBuffer[id.x].velocity *= 0.95f;
     
     particleBuffer[id.x].position += particleBuffer[id.x].velocity * deltaTime;
 
-    float size = boundsSize * 2;
-    
-    particleBuffer[id.x].position = positiveMod(particleBuffer[id.x].position + boundsSize, size) - boundsSize;
+    particleBuffer[id.x].position = keepInBounds(particleBuffer[id.x].position, boundsSize);
 }
  
